@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 
 
@@ -374,6 +375,14 @@ class Postnet:
 			x = conv1d(x, self.kernel_size, self.channels, lambda _: _, self.is_training, self.drop_rate, self.bnorm,
 				'conv_layer_{}_'.format(5)+self.scope)
 		return x
+
+
+def guided_attention(N, T, g=0.2): 
+	W = np.zeros((N, T), dtype=np.float32) 
+	for n in range(N): 
+		for t in range(T): 
+			W[n, t] = 1 - np.exp(-(t / float(T) - n / float(N)) ** 2 / (2 * g * g)) 
+	return W 
 
 
 def conv1d(inputs, kernel_size, channels, activation, is_training, drop_rate, bnorm, scope):

@@ -265,6 +265,7 @@ class Tacotron():
 			if post_condition:
 				log('  linear out:               {}'.format(self.tower_linear_outputs[i].shape))
 			log('  <stop_token> out:         {}'.format(self.tower_stop_token_prediction[i].shape))
+			log('  alignments:               {}'.format(alignments.shape))
 
 		#1_000_000 is causing syntax problems for some people?! Python please :)
 		log('  Tacotron Parameters       {:.3f} Million.'.format(np.sum([np.prod(v.get_shape().as_list()) for v in self.all_vars]) / 1000000))
@@ -279,6 +280,7 @@ class Tacotron():
 		self.tower_stop_token_loss = []
 		self.tower_regularization_loss = []
 		self.tower_linear_loss = []
+		self.tower_attention_loss = []
 		self.tower_loss = []
 
 		total_before_loss = 0
@@ -286,6 +288,7 @@ class Tacotron():
 		total_stop_token_loss = 0
 		total_regularization_loss = 0
 		total_linear_loss = 0
+		total_attention_loss = 0
 		total_loss = 0
 
 		gpus = ["/gpu:{}".format(i) for i in range(hp.tacotron_num_gpus)]
@@ -311,6 +314,14 @@ class Tacotron():
 						else:
 							linear_loss=0.
 					else:
+						# guided_attention loss 
+						N = self._hparams.max_text_length 
+						T = self._hparams.max_mel_frames 
+						A = tf.pad(self.tower_alignments[i], [(0, 0), (0, N), (0, T)], mode="CONSTANT", constant_values=-1.)[:, :N, :T] 
+						gts = tf.convert_to_tensor(guided_attention(N, T)) 
+						attention_masks = tf.to_float(tf.not_equal(A, -1)) 
+						attention_loss = tf.reduce_sum(tf.abs(A * gts) * attention_masks) 
+						attention_loss /= tf.reduce_sum(attention_masks)
 						# Compute loss of predictions before postnet
 						before = tf.losses.mean_squared_error(self.tower_mel_targets[i], self.tower_decoder_output[i])
 						# Compute loss after postnet
@@ -350,8 +361,9 @@ class Tacotron():
 					self.tower_stop_token_loss.append(stop_token_loss)
 					self.tower_regularization_loss.append(regularization)
 					self.tower_linear_loss.append(linear_loss)
+					self.tower_attention_loss.append(attention_loss)
 
-					tower_loss = before + after + stop_token_loss + regularization + linear_loss
+					tower_loss = before + after + stop_token_loss + regularization + linear_loss + attention_loss
 					self.tower_loss.append(tower_loss)
 
 			total_before_loss += before
@@ -359,6 +371,7 @@ class Tacotron():
 			total_stop_token_loss += stop_token_loss
 			total_regularization_loss += regularization
 			total_linear_loss += linear_loss
+			total_attention_loss += attention_loss
 			total_loss += tower_loss
 
 		self.before_loss = total_before_loss / hp.tacotron_num_gpus
@@ -366,6 +379,7 @@ class Tacotron():
 		self.stop_token_loss = total_stop_token_loss / hp.tacotron_num_gpus
 		self.regularization_loss = total_regularization_loss / hp.tacotron_num_gpus
 		self.linear_loss = total_linear_loss / hp.tacotron_num_gpus
+		self.attention_loss = total_attention_loss / hp.tacotron_num_gpus
 		self.loss = total_loss / hp.tacotron_num_gpus
 
 	def add_optimizer(self, global_step):

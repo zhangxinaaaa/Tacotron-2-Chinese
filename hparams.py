@@ -68,6 +68,7 @@ hparams = tf.contrib.training.HParams(
 	#train samples of lengths between 3sec and 14sec are more than enough to make a model capable of generating consistent speech.
 	clip_mels_length = True, #For cases of OOM (Not really recommended, only use if facing unsolvable OOM errors, also consider clipping your samples to smaller chunks)
 	max_mel_frames = 900,  #Only relevant when clip_mels_length = True, please only use after trying output_per_steps=3 and still getting OOM errors.
+	max_text_length = 400,  #Only relevant when clip_mels_length = True
 
 	# Use LWS (https://github.com/Jonathan-LeRoux/lws) for STFT and phase reconstruction
 	# It's preferred to set True to use with https://github.com/r9y9/wavenet_vocoder
