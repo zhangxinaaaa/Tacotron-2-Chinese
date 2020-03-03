@@ -38,41 +38,41 @@ def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12
             sentence_hanzi = ''
             sentence_pinyin = ''
 
-            punctuations_to_remove = ("#1" ,"#2", "#3", "#4", "“", "”", "！", "？", "。", "（", "）")
-            punctuations_to_remove_at_sentence_end = ("…", "—")
-            punctuations_to_convert_to_comma = ("，", "、", "：", "；", "…", "—")
+            punctuations_to_remove = ("“", "”", "！", "？", "。", "（", "）","…", "—", "，", "、", "：", "；", "#4", "#")
 
             for raw_line in lines:
                 line = raw_line.strip()
 
                 if line[0].isdigit():
                     sentence_index = line[:6]
-                    sentence_hanzi = line[7:].replace("——", "—").replace("……", "…")
+                    sentence_hanzi = line[7:]
 
                     for punctuation_to_remove in punctuations_to_remove:
                         sentence_hanzi = sentence_hanzi.replace(punctuation_to_remove, "")   
-
-                    if sentence_hanzi[-1] in punctuations_to_remove_at_sentence_end:
-                        sentence_hanzi = sentence_hanzi[:-1]
                 else:
                     sentence_pinyin_list = line.split(" ")
                     for i in range(0, len(sentence_hanzi)):
                         char = sentence_hanzi[i]
-                        if char in punctuations_to_convert_to_comma:
-                            sentence_pinyin_list.insert(i, ",") 
+                        if char.isdigit():
+                            sentence_pinyin_list.insert(i, "#" + char) 
                     sentence_pinyin = " ".join(sentence_pinyin_list) 
 
                     if len(sentence_hanzi) != len(sentence_pinyin_list):
                         if(sentence_index == "001464"):
                             sentence_hanzi_without_er = sentence_hanzi.replace("这儿", "这").replace("明儿", "明")    # Too ugly
+                        elif(sentence_index == "009197"):
+                            sentence_hanzi_without_er = sentence_hanzi.replace("说会儿", "说会")
+                        elif(sentence_index == "002365"):
+                            line = "zhe4 tu2 nan2 bu4 cheng2 shi4 pi1 guo4 de5"
+                            sentence_hanzi_without_er = "这图2难不成2是1批过的"
                         else:
                             sentence_hanzi_without_er = sentence_hanzi.replace("儿", "")
 
                         sentence_pinyin_list = line.split(" ")
                         for i in range(0, len(sentence_hanzi_without_er)):
                             char = sentence_hanzi_without_er[i]
-                            if char in punctuations_to_convert_to_comma:
-                                sentence_pinyin_list.insert(i, ",") 
+                            if char.isdigit():
+                                sentence_pinyin_list.insert(i, "#" + char) 
                         sentence_pinyin = " ".join(sentence_pinyin_list) 
 
                     wav_path = os.path.join(input_dir, 'Wave', '%s.wav' % sentence_index)
