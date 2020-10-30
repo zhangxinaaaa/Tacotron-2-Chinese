@@ -30,7 +30,7 @@ class Synthesizer:
 				self.model.initialize(inputs, input_lengths, split_infos=split_infos)
 
 			self.mel_outputs = self.model.tower_mel_outputs
-			self.linear_outputs = self.model.tower_linear_outputs if (hparams.predict_linear and not gta) else None
+			self.linear_outputs = self.model.tower_pit_outputs if (hparams.predict_linear and not gta) else None
 			self.alignments = self.model.tower_alignments
 			self.stop_token_prediction = self.model.tower_stop_token_prediction
 			self.targets = targets

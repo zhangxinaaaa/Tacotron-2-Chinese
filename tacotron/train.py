@@ -49,8 +49,8 @@ def add_train_stats(model, hparams):
 		if hparams.predict_linear:
 			tf.summary.scalar('linear_loss', model.linear_loss)
 			for i in range(hparams.tacotron_num_gpus):
-				tf.summary.histogram('linear_outputs %d' % i, model.tower_linear_outputs[i])
-				tf.summary.histogram('linear_targets %d' % i, model.tower_linear_targets[i])
+				tf.summary.histogram('linear_outputs %d' % i, model.tower_pit_outputs[i])
+				tf.summary.histogram('pit_targets %d' % i, model.tower_linear_targets[i])
 		
 		tf.summary.scalar('regularization_loss', model.regularization_loss)
 		tf.summary.scalar('stop_token_loss', model.stop_token_loss)
@@ -82,9 +82,9 @@ def model_train_mode(args, feeder, hparams, global_step):
 			model_name = 'Tacotron'
 		model = create_model(model_name or args.model, hparams)
 		if hparams.predict_linear:
-			model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets, feeder.token_targets, linear_targets=feeder.linear_targets,
-				targets_lengths=feeder.targets_lengths, global_step=global_step,
-				is_training=True, split_infos=feeder.split_infos)
+			model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets, feeder.token_targets, pit_targets=feeder.pit_targets,
+                             targets_lengths=feeder.targets_lengths, global_step=global_step,
+                             is_training=True, split_infos=feeder.split_infos)
 		else:
 			model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets, feeder.token_targets,
 				targets_lengths=feeder.targets_lengths, global_step=global_step,
@@ -102,8 +102,8 @@ def model_test_mode(args, feeder, hparams, global_step):
 		model = create_model(model_name or args.model, hparams)
 		if hparams.predict_linear:
 			model.initialize(feeder.eval_inputs, feeder.eval_input_lengths, feeder.eval_mel_targets, feeder.eval_token_targets,
-				linear_targets=feeder.eval_linear_targets, targets_lengths=feeder.eval_targets_lengths, global_step=global_step,
-				is_training=False, is_evaluating=True, split_infos=feeder.eval_split_infos)
+							 pit_targets=feeder.eval_pit_targets, targets_lengths=feeder.eval_targets_lengths, global_step=global_step,
+							 is_training=False, is_evaluating=True, split_infos=feeder.eval_split_infos)
 		else:
 			model.initialize(feeder.eval_inputs, feeder.eval_input_lengths, feeder.eval_mel_targets, feeder.eval_token_targets,
 				targets_lengths=feeder.eval_targets_lengths, global_step=global_step, is_training=False, is_evaluating=True, 
@@ -254,7 +254,7 @@ def train(log_dir, args, hparams):
 								eval_model.tower_loss[0], eval_model.tower_before_loss[0], eval_model.tower_after_loss[0],
 								eval_model.tower_stop_token_loss[0], eval_model.tower_linear_loss[0], eval_model.tower_mel_outputs[0][0],
 								eval_model.tower_mel_targets[0][0], eval_model.tower_targets_lengths[0][0],
-								eval_model.tower_alignments[0][0], eval_model.tower_linear_outputs[0][0],
+								eval_model.tower_alignments[0][0], eval_model.tower_pit_outputs[0][0],
 								eval_model.tower_linear_targets[0][0],
 								])
 							eval_losses.append(eloss)
@@ -323,7 +323,7 @@ def train(log_dir, args, hparams):
 						input_seq, mel_prediction, linear_prediction, alignment, target, target_length, linear_target = sess.run([
 							model.tower_inputs[0][0],
 							model.tower_mel_outputs[0][0],
-							model.tower_linear_outputs[0][0],
+							model.tower_pit_outputs[0][0],
 							model.tower_alignments[0][0],
 							model.tower_mel_targets[0][0],
 							model.tower_targets_lengths[0][0],
