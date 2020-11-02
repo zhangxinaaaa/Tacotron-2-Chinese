@@ -226,7 +226,7 @@ class Tacotron():
                         pit_projection = FrameProjection(hp.num_pit, scope='cbhg_linear_specs_projection',
                                                          activation=tf.nn.sigmoid)
 
-                        # [batch_size, decoder_steps(linear_frames), num_freq]
+                        # [batch_size, decoder_steps(linear_frames), num_pit]
                         pit_outputs = pit_projection(post_outputs)
 
                     # Grab alignments from the final decoder state

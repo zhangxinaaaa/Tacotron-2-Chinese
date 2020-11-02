@@ -1,6 +1,7 @@
 import os
 import time
 import traceback
+import joblib
 from datetime import datetime
 
 import numpy as np
@@ -133,6 +134,8 @@ def train(log_dir, args, hparams):
     eval_wav_dir = os.path.join(eval_dir, 'wavs')
     tensorboard_dir = os.path.join(log_dir, 'tacotron_events')
     meta_folder = os.path.join(log_dir, 'metas')
+    metadata_filename = ''
+    mapper = joblib.load(os.path.join(os.path.dirname(metadata_filename), 'mapper.pkl'))
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(plot_dir, exist_ok=True)
     os.makedirs(wav_dir, exist_ok=True)
@@ -147,8 +150,8 @@ def train(log_dir, args, hparams):
     input_path = os.path.join(args.base_dir, args.tacotron_input)
 
     if hparams.predict_pit:
-        linear_dir = os.path.join(log_dir, 'linear-spectrograms')
-        os.makedirs(linear_dir, exist_ok=True)
+        f32_dir = os.path.join(log_dir, 'pit-spectrograms')
+        os.makedirs(f32_dir, exist_ok=True)
 
     log('Checkpoint path: {}'.format(checkpoint_path))
     log('Loading training data from: {}'.format(input_path))
@@ -183,10 +186,10 @@ def train(log_dir, args, hparams):
     # Potential Griffin-Lim GPU setup
     if hparams.GL_on_GPU:
         GLGPU_mel_inputs = tf.placeholder(tf.float32, (None, hparams.num_mels), name='GLGPU_mel_inputs')
-        GLGPU_lin_inputs = tf.placeholder(tf.float32, (None, hparams.num_freq), name='GLGPU_pit_inputs')
+        GLGPU_pit_inputs = tf.placeholder(tf.float32, (None, hparams.num_pit), name='GLGPU_pit_inputs')
 
         GLGPU_mel_outputs = audio.inv_mel_spectrogram_tensorflow(GLGPU_mel_inputs, hparams)
-        GLGPU_lin_outputs = audio.inv_linear_spectrogram_tensorflow(GLGPU_lin_inputs, hparams)
+        # GLGPU_pit_outputs = audio.inv_linear_spectrogram_tensorflow(GLGPU_pit_inputs, hparams)
 
     # Book keeping
     step = 0
@@ -257,8 +260,8 @@ def train(log_dir, args, hparams):
                     before_losses = []
                     after_losses = []
                     stop_token_losses = []
-                    linear_losses = []
-                    linear_loss = None
+                    pit_losses = []
+                    pit_loss = None
 
                     if hparams.predict_pit:
                         for i in tqdm(range(feeder.test_steps)):
@@ -276,17 +279,19 @@ def train(log_dir, args, hparams):
                             before_losses.append(before_loss)
                             after_losses.append(after_loss)
                             stop_token_losses.append(stop_token_loss)
-                            linear_losses.append(linear_loss)
-                        linear_loss = sum(linear_losses) / len(linear_losses)
-
+                            pit_losses.append(pit_loss)
+                        pit_loss = sum(pit_losses) / len(pit_losses)
+                        """
                         if hparams.GL_on_GPU:
-                            wav = sess.run(GLGPU_lin_outputs, feed_dict={GLGPU_lin_inputs: lin_p})
+                            wav = sess.run(GLGPU_pit_outputs, feed_dict={GLGPU_pit_inputs: lin_p})
                             wav = audio.inv_preemphasis(wav, hparams.preemphasis, hparams.preemphasize)
                         else:
                             wav = audio.inv_linear_spectrogram(lin_p.T, hparams)
                         audio.save_wav(wav,
                                        os.path.join(eval_wav_dir, 'step-{}-eval-wave-from-linear.wav'.format(step)),
                                        sr=hparams.sample_rate)
+                        """
+
 
                     else:
                         for i in tqdm(range(feeder.test_steps)):
@@ -327,18 +332,20 @@ def train(log_dir, args, hparams):
                                                                                       eval_loss),
                                           target_spectrogram=mel_t,
                                           max_len=t_len)
-
-                    if hparams.predict_linear:
+                    """
+                    if hparams.predict_pit:
                         plot.plot_spectrogram(lin_p, os.path.join(eval_plot_dir,
                                                                   'step-{}-eval-linear-spectrogram.png'.format(step)),
                                               title='{}, {}, step={}, loss={:.5f}'.format(args.model, time_string(),
                                                                                           step, eval_loss),
                                               target_spectrogram=lin_t,
                                               max_len=t_len, auto_aspect=True)
+                    """
+
 
                     log('Eval loss for global step {}: {:.3f}'.format(step, eval_loss))
                     log('Writing eval summary!')
-                    add_eval_stats(summary_writer, step, linear_loss, before_loss, after_loss, stop_token_loss,
+                    add_eval_stats(summary_writer, step, pit_loss, before_loss, after_loss, stop_token_loss,
                                    eval_loss)
 
                 if step % args.checkpoint_interval == 0 or step == args.tacotron_train_steps or step == 300:
@@ -346,8 +353,8 @@ def train(log_dir, args, hparams):
                     saver.save(sess, checkpoint_path, global_step=global_step)
 
                     log('\nSaving alignment, Mel-Spectrograms and griffin-lim inverted waveform..')
-                    if hparams.predict_linear:
-                        input_seq, mel_prediction, linear_prediction, alignment, target, target_length, linear_target = sess.run(
+                    if hparams.predict_pit:
+                        input_seq, mel_prediction, pit_prediction, alignment, target, target_length, pit_target = sess.run(
                             [
                                 model.tower_inputs[0][0],
                                 model.tower_mel_outputs[0][0],
@@ -358,27 +365,28 @@ def train(log_dir, args, hparams):
                                 model.tower_pit_targets[0][0],
                             ])
 
+                        """ 
                         # save predicted linear spectrogram to disk (debug)
                         linear_filename = 'linear-prediction-step-{}.npy'.format(step)
-                        np.save(os.path.join(linear_dir, linear_filename), linear_prediction.T, allow_pickle=False)
+                        np.save(os.path.join(f32_dir, linear_filename), pit_prediction.T, allow_pickle=False)
 
                         # save griffin lim inverted wav for debug (linear -> wav)
                         if hparams.GL_on_GPU:
-                            wav = sess.run(GLGPU_lin_outputs, feed_dict={GLGPU_lin_inputs: linear_prediction})
+                            wav = sess.run(GLGPU_pit_outputs, feed_dict={GLGPU_pit_inputs: pit_prediction})
                             wav = audio.inv_preemphasis(wav, hparams.preemphasis, hparams.preemphasize)
                         else:
-                            wav = audio.inv_linear_spectrogram(linear_prediction.T, hparams)
+                            wav = audio.inv_linear_spectrogram(pit_prediction.T, hparams)
                         audio.save_wav(wav, os.path.join(wav_dir, 'step-{}-wave-from-linear.wav'.format(step)),
                                        sr=hparams.sample_rate)
 
                         # Save real and predicted linear-spectrogram plot to disk (control purposes)
-                        plot.plot_spectrogram(linear_prediction,
+                        plot.plot_spectrogram(pit_prediction,
                                               os.path.join(plot_dir, 'step-{}-linear-spectrogram.png'.format(step)),
                                               title='{}, {}, step={}, loss={:.5f}'.format(args.model, time_string(),
                                                                                           step, loss),
-                                              target_spectrogram=linear_target,
+                                              target_spectrogram=pit_target,
                                               max_len=target_length, auto_aspect=True)
-
+                        """
                     else:
                         input_seq, mel_prediction, alignment, target, target_length = sess.run([
                             model.tower_inputs[0][0],
@@ -391,6 +399,11 @@ def train(log_dir, args, hparams):
                     # save predicted mel spectrogram to disk (debug)
                     mel_filename = 'mel-prediction-step-{}.npy'.format(step)
                     np.save(os.path.join(mel_dir, mel_filename), mel_prediction.T, allow_pickle=False)
+                    pit_inversed = mapper.inverse(pit_prediction)
+                    f32_prediction = np.concatenate((mel_prediction, pit_inversed), axis=-1)
+                    f32_filename = 'f32-prediction-step-{}.npy'.format(step)
+                    np.save(os.path.join(f32_dir, f32_filename), f32_prediction.T, allow_pickle=False)
+
 
                     # save griffin lim inverted wav for debug (mel -> wav)
                     if hparams.GL_on_GPU:
