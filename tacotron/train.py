@@ -49,7 +49,7 @@ def add_train_stats(model, hparams):
 		if hparams.predict_linear:
 			tf.summary.scalar('linear_loss', model.linear_loss)
 			for i in range(hparams.tacotron_num_gpus):
-				tf.summary.histogram('linear_outputs %d' % i, model.tower_pit_outputs[i])
+				tf.summary.histogram('pit_outputs %d' % i, model.tower_pit_outputs[i])
 				tf.summary.histogram('pit_targets %d' % i, model.tower_linear_targets[i])
 		
 		tf.summary.scalar('regularization_loss', model.regularization_loss)
@@ -171,7 +171,7 @@ def train(log_dir, args, hparams):
 	#Potential Griffin-Lim GPU setup
 	if hparams.GL_on_GPU:
 		GLGPU_mel_inputs = tf.placeholder(tf.float32, (None, hparams.num_mels), name='GLGPU_mel_inputs')
-		GLGPU_lin_inputs = tf.placeholder(tf.float32, (None, hparams.num_freq), name='GLGPU_lin_inputs')
+		GLGPU_lin_inputs = tf.placeholder(tf.float32, (None, hparams.num_freq), name='GLGPU_pit_inputs')
 
 		GLGPU_mel_outputs = audio.inv_mel_spectrogram_tensorflow(GLGPU_mel_inputs, hparams)
 		GLGPU_lin_outputs = audio.inv_linear_spectrogram_tensorflow(GLGPU_lin_inputs, hparams)

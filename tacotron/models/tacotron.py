@@ -223,7 +223,8 @@ class Tacotron():
                         post_outputs = post_cbhg(mel_outputs, None)
 
                         # Linear projection of extracted features to make linear spectrogram
-                        pit_projection = FrameProjection(hp.num_pit, scope='cbhg_linear_specs_projection')
+                        pit_projection = FrameProjection(hp.num_pit, scope='cbhg_linear_specs_projection',
+                                                         activation=tf.nn.sigmoid)
 
                         # [batch_size, decoder_steps(linear_frames), num_freq]
                         pit_outputs = pit_projection(post_outputs)

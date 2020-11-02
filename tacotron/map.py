@@ -2,7 +2,6 @@ import os
 import fnmatch
 from scipy.special import erfinv, erf
 import numpy as np
-import random
 
 
 class Map(object):

@@ -1,7 +1,7 @@
 import os
 import threading
 import time
-
+import joblib
 import numpy as np
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
@@ -26,6 +26,7 @@ class Feeder:
         self._test_offset = 0
 
         # Load metadata
+        self.mapper = joblib.load(os.path.join(os.path.dirname(metadata_filename), 'mapper.pkl'))
         self._mel_dir = os.path.join(os.path.dirname(metadata_filename), 'mels')
         self._linear_dir = os.path.join(os.path.dirname(metadata_filename), 'linear')
         with open(metadata_filename, encoding='utf-8') as f:
@@ -133,6 +134,7 @@ class Feeder:
         f32_target = np.resize(f32_target, (-1, self._hparams.num_mels))
         mel_target = f32_target[:, :self._hparams.num_mels]
         pit_target = f32_target[:, self._hparams.num_mels:]
+        pit_target = self.mapper.map(pit_target)   # map pitch and corr into [0, 1]
         # Create parallel sequences containing zeros to represent a non finished sequence
         token_target = np.asarray([0.] * (len(mel_target) - 1))
         return (input_data, mel_target, token_target, pit_target, len(mel_target))
@@ -199,6 +201,7 @@ class Feeder:
         f32_target = np.resize(f32_target, (-1, self._hparams.num_mels))
         mel_target = f32_target[:, :self._hparams.num_mels]
         pit_target = f32_target[:, self._hparams.num_mels:]
+        pit_target = self.mapper.map(pit_target)
         token_target = np.asarray([0.] * (len(mel_target) - 1))
         return (input_data, mel_target, token_target, pit_target, len(mel_target))
 
